@@ -28,6 +28,8 @@ showMessage() {
             [SERVER_CONNECTING]='[SSHFS-MGR] Connecting to server %s...\n'
             [SERVER_CONNECT_SUCCESS]='[SSHFS-MGR] Server is now connected.\n'
             [SERVER_CONNECT_ERROR]='[SSHFS-MGR] Error while connecting to server.\n'
+            [SERVER_CONNECT_INIT_SCRIPT_SUCCESS]='[SSHFS-MGR] Successfully ran connect script on %s\n'
+            [SERVER_CONNECT_INIT_SCRIPT_FAIL]='[SSHFS-MGR] Failed running connect script on %s\n'
             [SERVER_DISCONNECT_ONE]='[SSHFS-MGR] Server is now disconnected.\n'
             [SERVER_DISCONNECT_ONE_ERROR]='[SSHFS-MGR] Error while disconnecting server.\n'
             [SERVER_DISCONNECT_ALL]='[SSHFS-MGR] All servers are now disconnected.\n'
@@ -76,7 +78,7 @@ checkIfServerExists() {
             result=0
         fi
     fi
-    
+
     return $result
 }
 
@@ -132,7 +134,7 @@ loadDataFile() {
                 isCore=0
                 serverIndex=$((serverIndex + 1))
             fi
-            
+
             continue
         fi
 
@@ -167,7 +169,7 @@ installNew() {
     showMessage INSTALL_NEW_CORE_MOUNTPATH
     read -e -i $defaultMountPath mountPath
     mountPath=${mountPath:-$defaultMountPath}
-    
+
     # Check installation directory
     if [ ! -d $scriptInstallDir ]; then
         mkdir -p $scriptInstallDir;
@@ -178,14 +180,14 @@ installNew() {
         mkdir -p $mountPath;
     fi
 
-   # Copy script into install directory
+    # Copy script into install directory
     scriptFileAbsolutePath="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
     scriptFileInstallPath="$scriptInstallDir/$(basename "${BASH_SOURCE[0]}")"
 
     cp $scriptFileAbsolutePath $scriptFileInstallPath
 
     bashCompletion="$userHome/.bash_completion"
-    # Check bash_completion 
+    # Check bash_completion
     if [[ ! -f "${bashCompletion}" ]]; then
         touch $bashCompletion
     fi
@@ -270,11 +272,11 @@ connectPrompt() {
         serverDomain=${serverList[$index]}
         mountDir=${servers[$serverDomain,'mountDir']}
         domain=${serverList[$index]}
-	if mountpoint -q "${config[mountPath]}/$mountDir"; then
-	    mountPointStatus="(\e[1;92m$(showMessage SERVER_STATUS_ONLINE)\e[0m)"
-	else
-	    mountPointStatus="(\e[1;91m$(showMessage SERVER_STATUS_OFFLINE)\e[0m)"
-	fi
+    if mountpoint -q "${config[mountPath]}/$mountDir"; then
+        mountPointStatus="(\e[1;92m$(showMessage SERVER_STATUS_ONLINE)\e[0m)"
+    else
+        mountPointStatus="(\e[1;91m$(showMessage SERVER_STATUS_OFFLINE)\e[0m)"
+    fi
         printf "\t$index - $mountPointStatus # $mountDir @ $domain\n"
     done
 
@@ -331,7 +333,8 @@ connect() {
     sourceDir=${servers[$serverDomain,'sourceDir']}
     mountDir=${servers[$serverDomain,'mountDir']}
     sshfsOptions=${servers[$serverDomain,'sshfsOptions']}
-    
+    connect_script=${servers[$serverDomain,'connect_script']}
+
     fullMountPath=${config[mountPath]}/$mountDir
 
     # Check mount directory
@@ -347,6 +350,20 @@ connect() {
         showMessage SERVER_CONNECT_ERROR
     fi
 
+    sync
+    sleep 0.2
+
+    if [ -z "$connect_script" ]; then
+        return
+    fi
+
+    ssh $user@$domain "$connect_script"
+    RET=$?
+    if [ "$RET" = "0" ]; then
+        showMessage SERVER_CONNECT_INIT_SCRIPT_SUCCESS $serverDomain
+    else
+        showMessage SERVER_CONNECT_INIT_SCRIPT_FAIL $serverDomain
+    fi
 }
 
 disconnect() {
