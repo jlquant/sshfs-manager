@@ -130,6 +130,7 @@ loadDataFile() {
 
             if [ $line == "[core]" ]; then
                 isCore=1
+
             else
                 isCore=0
                 serverIndex=$((serverIndex + 1))
@@ -145,6 +146,8 @@ loadDataFile() {
 
         if [ $isCore == 1 ]; then
             config[$dataKey]=$dataValue
+            # serverIndex=$((serverIndex + 1))
+
         else
             servers[$lastArrayKey,$dataKey]=$dataValue
             serverList[$serverIndex]=$lastArrayKey
@@ -267,8 +270,9 @@ connectPrompt() {
     fi
 
     # Print available server list
+    len=${#serverList[@]}
     showMessage AVAILABLE_SERVERS
-    for index in ${!serverList[*]}; do
+    for (( index=1; index<=$len; index++ )); do
         serverDomain=${serverList[$index]}
         mountDir=${servers[$serverDomain,'mountDir']}
         domain=${serverList[$index]}
